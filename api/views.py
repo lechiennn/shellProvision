@@ -4,6 +4,7 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from .models import ShellModel
 from .serializers import ShellSerializer
+from rest_framework.permissions import IsAuthenticated
 
 import docker
 
@@ -14,6 +15,7 @@ client = docker.from_env()
 
 class Shells(generics.GenericAPIView):
     serializer_class = ShellSerializer
+    permission_classes = [IsAuthenticated]
 
     # def create_container(**kwargs):
 
@@ -44,18 +46,33 @@ class Shells(generics.GenericAPIView):
             
             client.containers.run(
                 image='lechiennn/test-butterfly:3.0',
+                command=f'--max-session={request.data.get("max-session",4)}',
                 name=request.data['userID'],
-                hostname='cloudshell',
+                hostname=request.data.get('hostname','cloudshell'),
                 ports={57575:request.data['port']},
                 volumes={volume.name:{'bind': '/home/demo', 'mode': 'rw'}},
                 detach=True,
-                mem_limit='1g',
+                mem_limit=request.data.get('mem_limit', '1g'),
                 auto_remove=True, 
             )
             return Response({"status": "success"}, status=status.HTTP_201_CREATED)
         else:
             return Response({"status": "fail", "message": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
+
+class ShellDetail(generics.GenericAPIView):
+    serializer_class = ShellSerializer
+
+
+    def delete(self, request, id):
+        try:
+            instance = ShellModel.objects.filter(userID=id)
+            container = client.containers.get(id)
+            container.stop()
+            instance.delete()
+            return Response({"status": "success"}, status=status.HTTP_200_OK)
+        except:
+            return Response({"status": "fail", "message": f'no such container {id}'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 def index(request):
