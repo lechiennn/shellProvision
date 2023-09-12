@@ -17,21 +17,16 @@ class Shells(generics.GenericAPIView):
     serializer_class = ShellSerializer
     permission_classes = [IsAuthenticated]
 
-    # def create_container(**kwargs):
-
-    #     client.containers.run(
-    #         image=kwargs.get('image_name', 'lechiennn/test-butterfly:3.0'),
-    #         name=kwargs.get('container_name', 'test'),
-    #         hostname=kwargs.get('hostname','cloudshell'),
-    #         ports=kwargs.get('port', {57575:57575}),
-    #         detach=kwargs.get('detach', True),
-    #         mem_limit=kwargs.get('mem_limit','1g'),
-    #         auto_remove=kwargs.get('auto_remove', True), 
-    #     )
-
     def get_volume(self, id: str):
         if id not in client.volumes.list():
-            volume = client.volumes.create(id)
+            volume = client.volumes.create(
+                name=id,
+                # driver_opts={
+                #     'device': 'local',
+                #     'size': '100m',
+                #     'type': 'volume',
+                # }
+            )
         else:
             volume = client.volumes.get(id)
         return volume
@@ -45,17 +40,20 @@ class Shells(generics.GenericAPIView):
             volume = self.get_volume(request.data['userID'])
             
             client.containers.run(
-                image='lechiennn/test-butterfly:3.0',
+                image='lechiennn/test-butterfly:demo',
                 command=f'--max-session={request.data.get("max-session",4)}',
                 name=request.data['userID'],
                 hostname=request.data.get('hostname','cloudshell'),
-                ports={57575:request.data['port']},
+                # ports={57575:request.data['port']},
                 volumes={volume.name:{'bind': '/home/demo', 'mode': 'rw'}},
                 detach=True,
                 mem_limit=request.data.get('mem_limit', '1g'),
+                nano_cpus=1000000000,
                 auto_remove=True, 
+                network='traefik_traefik',
+                labels={f'traefik.http.routers.{request.data["userID"]}.rule': f"Host(`{request.data['userID']}.localhost`)", 'traefik.enable':'true'},
             )
-            return Response({"status": "success"}, status=status.HTTP_201_CREATED)
+            return Response({"status": f"shell available at {request.data['userID']}.localhost"}, status=status.HTTP_201_CREATED)
         else:
             return Response({"status": "fail", "message": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 

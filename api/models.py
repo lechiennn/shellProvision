@@ -5,7 +5,6 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 
 class ShellModel(models.Model):
     userID = models.CharField(max_length=255, unique=True)
-    port = models.PositiveIntegerField(validators=[MinValueValidator(6000), MaxValueValidator(7000)])
     createdAt = models.DateTimeField(auto_now_add=True)
     
     class Meta:
